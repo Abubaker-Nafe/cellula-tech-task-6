@@ -1,0 +1,16 @@
+redis
+langchain-core
+langchain-openrouter
+python-dotenv
+langchain-redis
+pydantic
+pypdf
+langchain-text-splitters
+langchain-huggingface
+sentence-transformers
+python-docx>=1.1.2
+python-pptx>=1.0.0
+requests
+beautifulsoup4
+faster-whisper
+streamlit>=1.66.0
