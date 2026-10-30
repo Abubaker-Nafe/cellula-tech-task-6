@@ -11,6 +11,13 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pypdf import PdfReader
 
+from embedding_config import (
+    CHUNK_OVERLAP_TOKENS,
+    CHUNK_TOKENS,
+    EMBEDDING_MAX_TOKENS,
+    get_embedding_tokenizer,
+)
+from ppt_ingestion import converted_pptx
 
 TEXT_EXTENSIONS = {
     ".txt", ".md",
@@ -133,6 +140,14 @@ def load_pptx(path: Path) -> list[Document]:
     return documents
 
 
+def load_ppt(path: Path) -> list[Document]:
+    with converted_pptx(path) as converted:
+        documents = load_pptx(converted)
+    for document in documents:
+        document.metadata["source"] = path.name
+    return documents
+
+
 def load_file(file_path: str | Path) -> list[Document]:
     path = Path(file_path)
 
@@ -157,10 +172,7 @@ def load_file(file_path: str | Path) -> list[Document]:
         documents = load_text(path)
 
     elif extension == ".ppt":
-        raise ValueError(
-            "Convert this .ppt file to .pptx using PowerPoint's "
-            "Save As option before loading it."
-        )
+        documents = load_ppt(path)
 
     else:
         raise ValueError(
@@ -185,13 +197,44 @@ def load_file(file_path: str | Path) -> list[Document]:
 def split_documents(
     documents: list[Document],
 ) -> list[Document]:
+    tokenizer = get_embedding_tokenizer()
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,
-        chunk_overlap=120,
-        add_start_index=True,
+        chunk_size=CHUNK_TOKENS,
+        chunk_overlap=CHUNK_OVERLAP_TOKENS,
+        length_function=lambda text: len(
+            tokenizer.encode(
+                text, add_special_tokens=False, truncation=False, verbose=False
+            )
+        ),
+        separators=["\n\n", "\n", " ", ""],
     )
 
-    return splitter.split_documents(documents)
+    def fitting_parts(text):
+        # Count final input including special tokens; never embed a truncated chunk.
+        if len(tokenizer.encode(
+            text, add_special_tokens=True, truncation=False, verbose=False
+        )) <= EMBEDDING_MAX_TOKENS:
+            return [text]
+        if len(text) < 2:
+            raise ValueError("A text fragment exceeds the embedding token limit.")
+        midpoint = len(text) // 2
+        return fitting_parts(text[:midpoint]) + fitting_parts(text[midpoint:])
+
+    chunks = []
+    for document in documents:
+        previous_start = -1
+        for text in splitter.split_text(document.page_content):
+            for part in fitting_parts(text):
+                # Token overlap is not a character offset; locate the exact substring.
+                start = document.page_content.find(part, previous_start + 1)
+                if start < 0:
+                    raise ValueError("Could not locate a chunk in its source text.")
+                chunks.append(Document(
+                    page_content=part,
+                    metadata={**document.metadata, "start_index": start},
+                ))
+                previous_start = start
+    return chunks
 
 
 ingestion_chain = (

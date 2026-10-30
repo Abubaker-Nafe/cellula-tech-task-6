@@ -11,6 +11,7 @@ from redis import Redis
 from redis.exceptions import RedisError
 
 from agent_memory import AgentMemories
+from cache_monitor import capture_cache_events
 from audio_ingestion import audio_ingestion_chain
 from ingestion import TEXT_EXTENSIONS, ingestion_chain
 from retrieval import build_retriever
@@ -67,7 +68,7 @@ from workflow import MAX_ITERATIONS
 
 
 ALLOWED_EXTENSIONS = TEXT_EXTENSIONS | {
-    ".pdf", ".docx", ".pptx", ".wav",
+    ".pdf", ".docx", ".ppt", ".pptx", ".wav",
 }
 
 if "retriever" not in st.session_state:
@@ -160,10 +161,33 @@ def process_sources(uploads, urls):
     return retriever, names, len(chunks)
 
 
+def show_cache_details(events) -> None:
+    with st.expander("Cache"):
+        if not events:
+            st.caption("Cache information was not recorded for this answer.")
+            return
+        st.table([
+            {
+                "Round": event["iteration"],
+                "Agent": event["agent"],
+                "Status": event["status"],
+            }
+            for event in events
+        ])
+        hits = sum(event["status"] == "HIT" for event in events)
+        misses = sum(event["status"] == "MISS" for event in events)
+        st.caption(f"{hits} hits · {misses} misses")
+        st.caption(
+            "Cache matches the full request, including conversation history. "
+            "Repeating a question can still produce a miss."
+        )
+
+
 def show_message(message: dict) -> None:
     with st.chat_message(message["role"]):
         if message.get("error"):
             st.error(message["content"])
+            show_cache_details(message.get("cache_events"))
             return
 
         result = message.get("result")
@@ -191,6 +215,8 @@ def show_message(message: dict) -> None:
 
             with st.expander("Evaluation feedback"):
                 st.write(result["feedback"])
+
+            show_cache_details(result.get("cache_events"))
 
             with st.expander("Sources"):
                 for source in result["retrieved_sources"]:
@@ -235,8 +261,8 @@ with st.sidebar:
     )
 
     st.caption(
-        "Save older .ppt presentations as .pptx "
-        "before uploading."
+        "PPT and PPTX presentations are supported. "
+        "Legacy PPT files are converted automatically."
     )
 
     url_text = st.text_area(
@@ -335,6 +361,7 @@ if question and question.strip():
     st.session_state.messages.append(user_message)
     show_message(user_message)
 
+    attempt_cache_events = []
     try:
         # Commit agent memories only when the workflow completes.
         attempt_memories = deepcopy(
@@ -350,7 +377,10 @@ if question and question.strip():
                 memories=attempt_memories,
             )
 
-            result = chain.invoke(question.strip())
+            with capture_cache_events() as attempt_cache_events:
+                result = chain.invoke(question.strip())
+
+        result["cache_events"] = list(attempt_cache_events)
 
         result["elapsed_seconds"] = (
             perf_counter() - started
@@ -379,6 +409,7 @@ if question and question.strip():
                 f"Could not complete the request: {error}"
             ),
             "error": True,
+            "cache_events": list(attempt_cache_events),
         }
         logger.exception("Answer generation failed")
 

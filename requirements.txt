@@ -1,11 +1,13 @@
 redis
-langchain-core
-langchain-openrouter
+langchain-core==1.7.1
+langchain-openrouter==0.2.9
+openrouter==0.11.46
 python-dotenv
-langchain-redis
-pydantic
+langchain-redis==0.2.6
+pydantic==2.12.5
 pypdf
 langchain-text-splitters
+transformers
 langchain-huggingface
 sentence-transformers
 python-docx>=1.1.2

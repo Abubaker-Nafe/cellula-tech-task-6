@@ -1,18 +1,9 @@
-import os
-from pathlib import Path
-
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from llm_cache import LoggedRedisCache
-from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
-from langchain_openrouter import ChatOpenRouter
+from llm_config import create_model
 
-load_dotenv(Path(__file__).with_name(".env"))
-
-model = ChatOpenRouter(
-    model=os.getenv("OPENROUTER_MODEL", "openrouter/free"),
-    temperature=0,
-    max_retries=0,
+model = create_model(
     cache=LoggedRedisCache(
         redis_url="redis://127.0.0.1:6379/0",
         ttl=3600,

@@ -5,8 +5,7 @@ from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from ingestion import ingestion_chain
-
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+from embedding_config import EMBEDDING_MODEL
 
 
 def build_retriever(chunks: list[Document]):

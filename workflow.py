@@ -3,6 +3,7 @@ import json
 from evaluator import evaluator_chain
 from generator import generator_chain
 from agent_memory import AgentMemories
+from cache_monitor import cache_stage
 
 MAX_ITERATIONS = 4
 
@@ -33,10 +34,11 @@ def run_workflow(
             "previous_answer": previous_answer,
             "feedback": feedback,
         }
-        answer = str(generator_chain.invoke({
-            **generator_inputs,
-            "generator_history": list(memories.generator.messages),
-        }))
+        with cache_stage("Generator", iteration):
+            answer = str(generator_chain.invoke({
+                **generator_inputs,
+                "generator_history": list(memories.generator.messages),
+            }))
         memories.generator.record_turn(generator_inputs, answer)
 
         evaluator_inputs = {
@@ -44,10 +46,11 @@ def run_workflow(
             "context": context,
             "answer": answer,
         }
-        evaluation = evaluator_chain.invoke({
-            **evaluator_inputs,
-            "evaluator_history": list(memories.evaluator.messages),
-        })
+        with cache_stage("Evaluator", iteration):
+            evaluation = evaluator_chain.invoke({
+                **evaluator_inputs,
+                "evaluator_history": list(memories.evaluator.messages),
+            })
         memories.evaluator.record_turn(
             evaluator_inputs,
             evaluation.model_dump_json(),
