@@ -5,6 +5,13 @@ source code, web/Wikipedia pages, and WAV recordings. A Generator creates an
 answer and an independent Evaluator approves it or supplies correction feedback.
 The workflow stops on approval or after a maximum of four rounds.
 
+## Deployed app
+
+Open the [Knowledge Assistant on Streamlit Community Cloud](https://cellula-tech-task-6.streamlit.app/).
+
+Upload your knowledge sources, click **Process sources**, and ask questions using
+the chat interface.
+
 ## Setup on Windows
 
 Use Python 3.11, Git, Docker Desktop with the Linux engine running, and LibreOffice
