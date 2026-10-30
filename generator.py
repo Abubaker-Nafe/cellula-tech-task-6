@@ -2,10 +2,11 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from llm_cache import LoggedRedisCache
 from langchain_core.output_parsers import StrOutputParser
 from llm_config import create_model
+from redis_config import create_redis_client
 
 model = create_model(
     cache=LoggedRedisCache(
-        redis_url="redis://127.0.0.1:6379/0",
+        redis_client=create_redis_client(),
         ttl=3600,
         prefix="task6:generator",
     ),

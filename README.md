@@ -1,6 +1,6 @@
 # Task 6: Generator-Evaluator Knowledge Assistant
 
-A local Streamlit application that answers questions from uploaded documents,
+A Streamlit application that answers questions from uploaded documents,
 source code, web/Wikipedia pages, and WAV recordings. A Generator creates an
 answer and an independent Evaluator approves it or supplies correction feedback.
 The workflow stops on approval or after a maximum of four rounds.
@@ -33,6 +33,7 @@ project, retain the current `.env` and API key.
 ```dotenv
 OPENROUTER_API_KEY=your_existing_key
 OPENROUTER_MODEL=dots-studio/dots-3-note-preview:free
+REDIS_URL=redis://127.0.0.1:6379/0
 ```
 
 Use a general-purpose model with native JSON-schema support for the Evaluator.
@@ -58,6 +59,17 @@ Open the displayed localhost URL. Upload files, enter URLs (one per line), click
 **Process sources**, and ask a question. Processing new sources starts a new
 conversation. The first use downloads the embedding tokenizer/model and, for
 WAV input, the Whisper model. Subsequent uses can read the downloaded files.
+
+## Streamlit Community Cloud
+
+See [STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md) for applying this update to
+an already deployed app. The app, Generator, Evaluator, and Redis diagnostic now
+read the same `REDIS_URL`. Its default remains the local Docker endpoint; set a
+hosted Redis URL in Streamlit Secrets for cloud deployment. The hosted service
+must support JSON.GET/JSON.SET. Upstash Redis provides a free option with TLS and
+these commands; use its Redis/TCP connection rather than its HTTPS REST endpoint.
+Root `packages.txt` installs LibreOffice Impress in Community Cloud, and the
+Windows `LIBREOFFICE_PATH` should stay local. No cache-data migration is needed.
 
 ## Supported knowledge sources
 
@@ -134,6 +146,13 @@ flowchart TD
 
 ## Redis and request configuration
 
+`redis_config.py` reads `REDIS_URL` from the environment (or the local root `.env`)
+for every Redis client. The URL supplies authentication, host, port, and database;
+`rediss://` enables TLS. Keep the URL in Secrets because it can contain a password.
+The connection helper sets five-second connection/read timeouts. The diagnostic
+`python -m test_files.check_redis` verifies both connectivity and the JSON commands
+required by the cache, then removes only its own temporary probe.
+
 Each answer includes a **Cache** expander beside **Evaluation feedback** and
 **Sources**. It lists the actual Generator and Evaluator lookup status for every
 round, plus total hits and misses. Mixed results are shown separately. These are
@@ -168,11 +187,13 @@ under `test_files` use module invocation:
 ```cmd
 python -m test_files.check_memory
 python -m test_files.check_llm
+python -m test_files.check_redis
 python -m unittest discover -s tests -v
 ```
 
 `check_memory` and the regression suite are offline. `check_llm` makes one live model
-request using the root `.env`. The regression suite uses synthetic SDK responses,
+request using the root `.env`. `check_redis` connects to the configured Redis endpoint.
+The regression suite uses synthetic SDK responses,
 test doubles for Redis I/O, the real LangChain parsing path, and mocked HTTP transport.
 It does not overwrite existing Redis entries or download models.
 Warning messages about invalid assessments are expected in these synthetic tests;
@@ -220,4 +241,8 @@ sources are processed, and documents are re-embedded. Histories, the vector stor
 and uploaded temporary files are not persistent across an app restart. Redis is the
 persistent cache, not the agent-memory store or a permanent document database.
 
-The update adds cache visibility without changing which inputs match in Redis.
+The update adds cache visibility and a configurable deployment endpoint without
+changing which inputs match in Redis. The 29 offline regression checks passed;
+they include local endpoint defaults, TLS/password URL parsing, both agent clients,
+and a JSON-capability diagnostic. A live hosted Redis or Streamlit deployment was
+not accessed during these checks; perform the deployment smoke checks above.

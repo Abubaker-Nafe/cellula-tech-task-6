@@ -7,7 +7,6 @@ from time import perf_counter
 
 import streamlit as st
 from dotenv import load_dotenv
-from redis import Redis
 from redis.exceptions import RedisError
 
 from agent_memory import AgentMemories
@@ -15,6 +14,7 @@ from cache_monitor import capture_cache_events
 from audio_ingestion import audio_ingestion_chain
 from ingestion import TEXT_EXTENSIONS, ingestion_chain
 from retrieval import build_retriever
+from redis_config import create_redis_client
 from web_ingestion import web_ingestion_chain
 
 
@@ -37,30 +37,27 @@ st.caption(
 
 if not os.getenv("OPENROUTER_API_KEY"):
     st.error(
-        "Add OPENROUTER_API_KEY to your .env file, "
+        "Add OPENROUTER_API_KEY to Streamlit Secrets or your local .env file, "
         "then restart the app."
     )
     st.stop()
 
-redis_client = Redis(
-    host="127.0.0.1",
-    port=6379,
-    db=0,
-    socket_connect_timeout=2,
-    socket_timeout=2,
-)
-
+redis_client = None
 try:
+    redis_client = create_redis_client()
     redis_client.ping()
-except RedisError:
+except (RedisError, ValueError):
     st.error(
-        "Redis is unavailable. Start Docker Desktop "
-        "and Redis, then reload."
+        "Redis is unavailable. For a deployed app, set REDIS_URL in Streamlit "
+        "Secrets to your hosted Redis connection URL and check credentials, "
+        "TLS settings, and network access."
     )
+    st.caption("For local Docker Redis, start Docker Desktop and run:")
     st.code("docker compose up -d", language="shell")
     st.stop()
 finally:
-    redis_client.close()
+    if redis_client is not None:
+        redis_client.close()
 
 # Initialize the LLM workflow after the connection checks.
 from rag_workflow import build_rag_chain

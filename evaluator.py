@@ -10,6 +10,7 @@ from evaluation_schema import (
 )
 from llm_cache import LoggedRedisCache
 from llm_config import create_model
+from redis_config import create_redis_client
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,7 @@ prompt = ChatPromptTemplate.from_messages([
 model = create_model(
     require_parameters=True,
     cache=LoggedRedisCache(
-        redis_url="redis://127.0.0.1:6379/0",
+        redis_client=create_redis_client(),
         ttl=3600,
         prefix="task6:evaluator:v3",
         validate_generation=validate_evaluation_generation,
