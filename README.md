@@ -71,6 +71,12 @@ these commands; use its Redis/TCP connection rather than its HTTPS REST endpoint
 Root `packages.txt` installs LibreOffice Impress in Community Cloud, and the
 Windows `LIBREOFFICE_PATH` should stay local. No cache-data migration is needed.
 
+For WAV uploads, `requirements.txt` pins faster-whisper 1.2.1 and PyAV 18.1.0.
+PyAV 19 removed an argument passed by this released decoder, causing
+`open() got an unexpected keyword argument 'metadata_errors'`. See
+[AUDIO_DEPENDENCY_FIX.md](AUDIO_DEPENDENCY_FIX.md) for updating a deployed app and
+opening its Cloud logs. No system FFmpeg installation is needed for this fix.
+
 ## Supported knowledge sources
 
 | Input | Processing | Source information retained |
@@ -227,7 +233,7 @@ cache miss followed by a hit when their inputs/settings have not already been ca
 
 The behavior-sensitive dependencies are pinned in `requirements.txt`: LangChain Core
 1.7.1, langchain-openrouter 0.2.9, OpenRouter SDK 0.11.46, langchain-redis 0.2.6, and
-Pydantic 2.12.5. The update's automated checks were run under Python 3.12.14 with these
+Pydantic 2.12.5, faster-whisper 1.2.1, and PyAV 18.1.0. The update's automated checks were run under Python 3.12.14 with these
 versions. Real tokenizer/chunk tests and real LibreOffice conversion were also run.
 The Cache panel was checked with Streamlit 1.66.1 AppTest for completed answers,
 provider-error messages, older messages without cache data, and page reruns.
@@ -242,7 +248,12 @@ and uploaded temporary files are not persistent across an app restart. Redis is 
 persistent cache, not the agent-memory store or a permanent document database.
 
 The update adds cache visibility and a configurable deployment endpoint without
-changing which inputs match in Redis. The 29 offline regression checks passed;
+changing which inputs match in Redis. The 31 offline regression checks passed;
 they include local endpoint defaults, TLS/password URL parsing, both agent clients,
-and a JSON-capability diagnostic. A live hosted Redis or Streamlit deployment was
+and a JSON-capability diagnostic. Real audio decoding tests cover mono input and
+stereo downmixing/resampling without downloading Whisper weights. The uploaded WAV
+reproduced the PyAV 19 failure and decoded successfully with the pinned version.
+The real Whisper base model and application audio-ingestion chain also transcribed
+the supplied WAV successfully into one chunk, with source/timestamp metadata.
+A live hosted Redis or Streamlit deployment was
 not accessed during these checks; perform the deployment smoke checks above.
